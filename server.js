@@ -63,6 +63,7 @@ function getConnection(callback) {
 
 const shopifyHeaders = {
   'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN,
+  'Content-Type':'application/json'
 };
 
 // Endpoint to fetch products
@@ -83,7 +84,7 @@ app.get('/products', async (req, res) => {
 
 app.get('/orders', async (req, res) => {
   //const { customerEmail } = req.query;
-  const customerEmail = 'jane@testmail.com';
+  const customerEmail = 'newzap@testmail.com';
   //const customerEmail = 'jack@testmail.com';
 
   if (!customerEmail) {
@@ -94,8 +95,8 @@ app.get('/orders', async (req, res) => {
     const response = await axios.get(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/orders.json`, {
       headers: shopifyHeaders,
       params: {
-        fulfillment_status: 'fulfilled', //null //fulfilled
-        financial_status: 'any', //pending //null en pending -> used for unfulf orders
+        fulfillment_status: 'null', //null //fulfilled
+        financial_status: 'pending', //pending //null en pending -> used for unfulf orders
         email: customerEmail,
         fields: 'id,email,financial_status,fulfillment_status,created_at,line_items',
       },
@@ -122,6 +123,46 @@ app.get('/salesforce/accounts', async (req, res) => {
   }
 });
 */
+
+// PUT request to update an order
+app.put('/orders/:id', async (req, res) => {
+  const orderId = req.params.id;
+  const orderData = {
+    order: {
+      id: orderId,
+      financial_status:"pending",
+    }
+  };
+
+  try {
+    const response = await axios.put(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/orders/${orderId}.json`, 
+      orderData,
+      { headers: shopifyHeaders }
+    );
+    console.log(response.data.order);
+    res.json(response.data.order);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update order' });
+  }
+});
+
+// PUT request to update an order
+app.put('/orders/:id', async (req, res) => {
+  const orderId = req.params.id;
+  const transactionData = {"transaction":{"kind":"sale","parent_id":5075547193646}}
+
+  try {
+    const response = await axios.put(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/orders/${orderId}/transactions.json`, 
+      transactionData,
+      { headers: shopifyHeaders }
+    );
+    console.log(response.data.transaction);
+    res.json(response.data.transaction);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update order' });
+  }
+});
+
 app.get('/salesforce/accounts', (req, res) => {
   getConnection((err, conn) => {
     if (err) {
