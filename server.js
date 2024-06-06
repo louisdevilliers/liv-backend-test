@@ -124,40 +124,127 @@ app.get('/salesforce/accounts', async (req, res) => {
 });
 */
 
-// PUT request to update an order
-app.put('/orders/:id', async (req, res) => {
-  const orderId = req.params.id;
-  const orderData = {
-    order: {
-      id: orderId,
-      financial_status:"pending",
+//Create Draft order and MARK AS PAID
+//#Customer ID
+//#Get product
+//#Get product variant
+//#Create Draft order
+//#Complete Draft order
+//#Get order number
+//#Get draft order transaction id
+//#Post transaction
+
+
+//Create Draft order and MARK AS FULFILLED
+//#Customer ID
+//#Get product variant
+let beneficiaryVariantId;
+app.get('/products/:bundleTitle', async (req, res) => {
+  let bundleTitle = req.params.bundleTitle;
+  try {
+    const response = await axios.get(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/products.json`, {
+      headers: shopifyHeaders,
+    });
+    // Filter products by title
+    const filteredProducts = response.data.products.filter(product => product.title.includes(bundleTitle));
+    
+    // Log variant IDs of filtered products
+    // filteredProducts.forEach(product => {
+    //   product.variants.forEach(variant => {
+    //     console.log(variant.id);
+    //   });
+    // });
+    console.log("Default Price ID",filteredProducts[0].variants[0].id)
+    console.log("Variant Price ID",filteredProducts[0].variants[1].id)
+
+    res.json(filteredProducts[0].variants[0].id);
+    beneficiaryVariantId = filteredProducts[0].variants[0].id;
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+//#Create Draft order
+let draftOrderId;
+app.post('/draft/:id', async (req, res) => {
+  const customerId = req.params.id;
+  const draftData = {
+    draft_order: {
+      line_items: [
+        {
+          variant_id: beneficiaryVariantId,//used variant because I alrady used before
+          quantity: 1
+        }
+      ],
+      customer:{id:customerId}
     }
   };
 
   try {
-    const response = await axios.put(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/orders/${orderId}.json`, 
-      orderData,
+    const response = await axios.post(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/draft_orders.json`, 
+      draftData,
       { headers: shopifyHeaders }
     );
-    console.log(response.data.order);
-    res.json(response.data.order);
+    res.json(response.data);
+    draftOrderId = response.data.draft_order.id;
+    console.log("draftOrderId",draftOrderId);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update order' });
+  }
+});
+let orderId;
+//#Complete Draft order and get order id
+app.put('/completeDraftOrder/:draftOrderId', async (req, res) => {
+  // const draftOrderId=req.params.draftOrderId
+  try {
+    const response = await axios.put(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/draft_orders/${draftOrderId}/complete.json?payment_pending=true`,
+      {}, 
+      {
+        headers: shopifyHeaders
+      }  
+    );
+    console.log("Darft order Id",response.data.draft_order.order_id);
+    res.json(response.data.draft_order.order_id);
+    orderId = response.data.draft_order.order_id;//Get order number
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order' });
   }
 });
 
-// PUT request to update an order
-app.put('/orders/:id', async (req, res) => {
-  const orderId = req.params.id;
-  const transactionData = {"transaction":{"kind":"sale","parent_id":5075547193646}}
+//#Get fulfillments
+let fulfillmentId
+app.get('/fulfillments/:orderId', async (req, res) => {
+  // const orderId=req.params.orderId
+  try {
+    const response = await axios.get(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/orders/${orderId}/fulfillment_orders.json`, {
+      headers: shopifyHeaders,
+    });
+    console.log("Fulfillment Id",response.data.fulfillment_orders[0].id)
+    res.json(response.data.fulfillment_orders[0].id);
+    fulfillmentId = response.data.fulfillment_orders[0].id;
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+//#Post fulfillment status as paid
+app.post('/setFulfillment/:fulfillmentId', async (req, res) => {
+  // const fulfillmentId=req.params.fulfillmentId
+  const fulfillmentData = {
+    fulfillment:{
+      line_items_by_fulfillment_order:
+      [
+        {fulfillment_order_id:fulfillmentId}
+      ]
+    }
+  };
 
   try {
-    const response = await axios.put(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/orders/${orderId}/transactions.json`, 
-      transactionData,
+    const response = await axios.post(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-04/fulfillments.json`, 
+      fulfillmentData,
       { headers: shopifyHeaders }
     );
-    console.log(response.data.transaction);
-    res.json(response.data.transaction);
+    res.json(response.data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order' });
   }
