@@ -265,6 +265,105 @@ app.get('/salesforce/accounts', (req, res) => {
     });
   });
 });
+//#Get Clothing Bundle
+app.get('/salesforce/clothing-bundle/:bundleCode', (req, res) => {
+  const bundleCode = req.params.bundleCode;
+  getConnection((err, conn) => {
+    if (err) {
+      console.error('Error logging into Salesforce:', err);
+      return res.status(500).json({ error: 'Failed to log into Salesforce' });
+    }
+    conn.query(`SELECT Id, Name,Beneficiary__c FROM Clothing_Bundles__c WHERE Name = '${bundleCode}' LIMIT 1`, (err, result) => {
+      if (err) {
+        console.error('Error fetching data from Salesforce:', err);
+        return res.status(500).json({ error: 'Failed to fetch data from Salesforce' });
+      }
+      res.json(result.records);
+    });
+  });
+});
+//#Add Items sold 
+app.put('/salesforce/clothing-bundle/:bundleCode', (req, res) => {
+  const bundleCode = req.params.bundleCode;
+  // const beneficiaryId = req.params.beneficiaryId;
+  const itemsArray = {
+    items: [
+      {
+        date: "2024/05/16",
+        quantity: 1,
+        description: "White shirt",
+        salesPrice: 56.0,
+      },
+      {
+        date: "2024/05/16",
+        quantity: 2,
+        description: "One piece",
+        salesPrice: 50.0,
+      },
+      {
+        date: "2024/05/16",
+        quantity: 2,
+        description: "Two piece",
+        salesPrice: 50.0,
+      }
+   ]}
+
+  
+
+
+   getConnection((err, conn) => {
+    if (err) {
+      console.error('Error logging into Salesforce:', err);
+      return res.status(500).json({ error: 'Failed to log into Salesforce' });
+    }
+
+    conn.query(`SELECT Id, Beneficiary__c FROM Clothing_Bundles__c WHERE Name = '${bundleCode}' LIMIT 1`, (err, result) => {
+      if (err) {
+        console.error('Error fetching data from Salesforce:', err);
+        return res.status(500).json({ error: 'Failed to fetch data from Salesforce' });
+      }
+
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: 'Clothing bundle not found' });
+      }
+      console.log(result.records);
+      const bundleRecord = result.records[0];
+
+      // Update the bundle items field
+      bundleRecord.Bundle_Items__c = JSON.stringify(itemsArray); // Assuming Bundle_Items__c is a text field
+
+      // // Update the Clothing Bundle record
+      // conn.update('Clothing_Bundles__c', bundleRecord, (err, updateResult) => {
+      //   if (err) {
+      //     console.error('Error updating Clothing Bundle record:', err);
+      //     return res.status(500).json({ error: 'Failed to update Clothing Bundle record in Salesforce' });
+      //   }
+      //   res.status(200).json(updateResult); // Return the update result
+      // });
+      // Initialize a variable to store the total sales price
+      let totalSalesPrice = 0;
+
+      // Iterate over each item in the items array
+      itemsArray.items.forEach(item => {
+          // Add the salesPrice of the current item to the totalSalesPrice
+          totalSalesPrice += (item.salesPrice*item.quantity);
+      });
+
+      // itemsArray.totalPrice = totalSalesPrice;
+      console.log(totalSalesPrice);
+      // Update the Selling Price field on the Clothing Bundle record
+      bundleRecord.Selling_Price__c = totalSalesPrice;
+      // Update the Selling Price
+      conn.update('Clothing_Bundles__c', bundleRecord, (err, finalUpdateResult) => {
+        if (err) {
+          console.error('Error updating Clothing Bundle record:', err);
+          return res.status(500).json({ error: 'Failed to update Clothing Bundle record in Salesforce' });
+        }
+        res.status(200).json(finalUpdateResult); // Return the update result
+      });
+    });
+  });
+});
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
